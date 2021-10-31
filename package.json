@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0-pre",
+  "description": "Philip's Cognito playground",
+  "homepage": "https://github.com/philipmw/cognito-playground",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity": "^3.39.0",
+    "@aws-sdk/client-dynamodb": "^3.39.0",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/philipmw/cognito-playground"
+  },
+  "devDependencies": {
+    "@types/react": "~17",
+    "@types/react-dom": "latest",
+    "@typescript-eslint/eslint-plugin": "latest",
+    "@typescript-eslint/parser": "latest",
+    "eslint": "latest",
+    "ts-loader": "latest",
+    "typescript": "latest",
+    "webpack": "latest",
+    "webpack-cli": "latest",
+    "webpack-dev-server": "latest"
+  },
+  "scripts": {
+    "build": "webpack && npm run lint",
+    "lint": "eslint -c eslintrc-src.yml src",
+    "start": "webpack-dev-server --open"
+  }
+}

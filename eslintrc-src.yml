@@ -1,0 +1,18 @@
+---
+extends:
+  - "eslint:recommended"
+  - "plugin:@typescript-eslint/all"
+parser: "@typescript-eslint/parser"
+parserOptions:
+  project: "./tsconfig.json"
+plugins:
+  - "@typescript-eslint"
+rules:
+  "@typescript-eslint/indent":
+    - error
+    - 2
+  "@typescript-eslint/space-before-function-paren":
+    - error
+    - never
+ignorePatterns:
+  - "**/*.test.tsx"
