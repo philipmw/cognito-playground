@@ -19,9 +19,30 @@ This project has two parts:
 2. A React webapp that accepts the auth code from Cognito user pool's web login endpoint,
     exchanges the code for JWT tokens, then requests an identity pool ID and short-term
     AWS credentials to interact with services.
-    The app interacts with DynamoDB directly using the short-term AWS credentials, and
-    it interacts with a protected API Gateway endpoint using the JWT.
-   (This is not great. See *Limitations* section.)
+
+## Identifiers
+
+There are two identifiers: *identity pool* ID and *user pool* ID.
+
+The webapp first authenticates with a user pool (getting a user pool ID),
+then receives an identity pool ID.
+It uses JWT authorization for backend API calls (API Gateway), which means
+the backend gets the *user pool* ID.
+But it uses IAM authorization for client-side DynamoDB calls, which means
+DynamoDB receives and keys items on the *identity pool* ID.
+
+I'd like to standardize on one ID.
+
+**Option 1:**
+Convert the API Gateway endpoint to use IAM auth instead of JWT auth.
+Then the webapp can use the *identity pool* ID exclusively.
+
+**Option 2:**
+Do not make client-side DynamoDB calls; instead, all operations go through my API endpoint.
+Or find a way to receive STS credentials from the user pool rather than identity pool;
+I did some research and didn't find a way to do it. Only [this AWS forums thread](https://forums.aws.amazon.com/thread.jspa?threadID=230067)
+implies that it's possible.
+Then the webapp can use the *user pool* ID exclusively.
 
 ## Setup
 
@@ -66,9 +87,5 @@ Voila!
    When the token expires, Cognito token exchange returns status code 400 with response text:
    > {"error":"invalid_grant"}
    
-2. There are two identifiers: *identity pool* ID and *user pool* ID.
-   At this time, I have API Gateway configured for JWT authorization,
-   so the Lambda function receives the caller's *user pool* ID,
-   while I have DynamoDB doing IAM authorization using STS credentials from the Identity Pool,
-   so the DDB table items are keyed by *identity pool* ID.
-   I need to use one ID for both purposes.
+2. There are two identifiers. See the *Identifiers* section above.
+   I want to standardize on one identifier.

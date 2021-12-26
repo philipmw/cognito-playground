@@ -20,6 +20,7 @@ const cognitoClient = new CognitoIdentityClient({
 });
 
 type VisitorCount = number | undefined;
+type CognitoTokensResponse = CognitoTokens | undefined;
 
 const App = () => {
   const [status, setStatus] = useState([] as string[]);
@@ -29,9 +30,9 @@ const App = () => {
   const code = params.get("code");
 
   // Cognito state
-  const [tokens, setTokens] = useState({} as CognitoTokens);
+  const [tokens, setTokens] = useState(undefined as CognitoTokensResponse);
   const [cognitoId, setCognitoId] = useState(undefined as CognitoIdentityId);
-  const [creds, setCreds] = useState({} as Creds);
+  const [creds, setCreds] = useState(undefined as Creds);
 
   // Business logic
   const [visitorCount, setVisitorCount] = useState(undefined as VisitorCount);
@@ -66,7 +67,7 @@ const App = () => {
   }, [code]);
 
   useEffect(() => {
-    if (tokens.id_token == undefined) {
+    if (tokens?.id_token == undefined) {
       // nothing to do for now
       return;
     }
@@ -78,7 +79,7 @@ const App = () => {
   }, [tokens]);
 
   useEffect(() => {
-    if (cognitoId == undefined || tokens.id_token == undefined) {
+    if (cognitoId == undefined || tokens?.id_token == undefined) {
       // nothing to do for now
       return;
     }
@@ -96,7 +97,7 @@ const App = () => {
     }
     registerVisitor(creds, cognitoId)
       .then(() => {
-        setStatus(status.concat(["added visit to DDB"]));
+        setStatus(status.concat([`added visit to DDB using IAM access key ${creds.AccessKeyId}`]));
       })
       .catch(e => {
         setStatus(status.concat(["DDB update error: " + e]));
@@ -114,7 +115,7 @@ const App = () => {
   }, [creds, cognitoId]);
 
   useEffect(() => {
-    postToBackend(tokens.id_token)
+    postToBackend(tokens?.id_token)
       .then(setBackendApiResponse)
       .catch(setBackendApiResponse);
   }, [tokens]);
