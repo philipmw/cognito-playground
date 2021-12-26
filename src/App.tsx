@@ -1,89 +1,67 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import {useEffect, useState} from "react";
-import {
-  CognitoIdentityClient,
-  Credentials,
-  GetCredentialsForIdentityCommand,
-  GetIdCommand
-} from "@aws-sdk/client-cognito-identity";
+import { CognitoIdentityClient } from "@aws-sdk/client-cognito-identity";
 
-import {CognitoTokens, exchangeCodeForTokens} from "./cognito-utils";
+import {CognitoIdentityId, CognitoTokens, Creds, exchangeCodeForTokens, getCredsForId, getId} from "./cognito-utils";
 import {
   AWS_REGION,
   COGNITO_CLIENT_ID,
-  IDENTITY_POOL_ID,
   REDIRECT_URI,
   USER_POOL_DOMAIN,
-  USER_POOL_ISSUER
 } from "./constants";
 import {getVisitorCount, registerVisitor} from "./visitor-count-utils";
 import {recallTokens, saveTokens} from "./storage-utils";
+import {postToBackend} from "./backend-utils";
+import {getJwtSub} from "./jwt-utils";
 
 const cognitoClient = new CognitoIdentityClient({
   region: AWS_REGION,
 });
 
-type CognitoIdentityId = string | undefined;
 type VisitorCount = number | undefined;
 
-async function getId(idToken): Promise<CognitoIdentityId> {
-  const command = new GetIdCommand({
-    IdentityPoolId: IDENTITY_POOL_ID,
-    Logins: {
-      [USER_POOL_ISSUER]: idToken,
-    },
-  });
-  const response = await cognitoClient.send(command);
-  return response.IdentityId;
-}
-
-type Creds = Credentials | undefined;
-async function getCredsForId(id, idToken): Promise<Creds> {
-  const command = new GetCredentialsForIdentityCommand({
-    IdentityId: id,
-    Logins: {
-      [USER_POOL_ISSUER]: idToken,
-    },
-  });
-  const response = await cognitoClient.send(command);
-  return response.Credentials;
-}
-
 const App = () => {
+  const [status, setStatus] = useState([] as string[]);
+
   const params = new URLSearchParams(window.location.search);
+  // auth code from user pool login UX
   const code = params.get("code");
-  const [status, setStatus] = useState("init");
+
+  // Cognito state
   const [tokens, setTokens] = useState({} as CognitoTokens);
   const [cognitoId, setCognitoId] = useState(undefined as CognitoIdentityId);
   const [creds, setCreds] = useState({} as Creds);
+
+  // Business logic
   const [visitorCount, setVisitorCount] = useState(undefined as VisitorCount);
+  const [backendApiResponse, setBackendApiResponse] = useState("{initialState}");
 
   useEffect(() => {
     const recalledTokens = recallTokens();
     if (recalledTokens) {
       console.log("recalled tokens: " + recalledTokens);
       setTokens(JSON.parse(recalledTokens));
-      setStatus("recalled tokens");
+      setStatus(status.concat(["recalled tokens"]));
       return;
     }
 
     if (!code) {
-      setStatus("no code in query param; log in first");
+      setStatus(status.concat(["no code in query param; log in first"]));
       return;
     }
 
-    setStatus("exchanging code");
+    setStatus(status.concat(["exchanging code"]));
     exchangeCodeForTokens(code)
       .then(tokens => {
         setTokens(tokens);
         saveTokens(tokens);
       })
       .then(() => {
-        setStatus("code exchanged for tokens");
+        setStatus(status.concat(["Cognito code exchanged for tokens"]));
       })
       .catch(e => {
-        setStatus("Cognito exchange error: " + e.toString());
+        setStatus(status.concat(["Cognito exchange error: " + e.toString()]));
       })
   }, [code]);
 
@@ -92,10 +70,10 @@ const App = () => {
       // nothing to do for now
       return;
     }
-    getId(tokens.id_token)
-      .then((id) => setCognitoId(id))
+    getId(cognitoClient, tokens.id_token)
+      .then(setCognitoId)
       .catch(e => {
-        setStatus("Cognito getId error: " + e.toString());
+        setStatus(status.concat(["Cognito getId error: " + e.toString()]));
       });
   }, [tokens]);
 
@@ -104,10 +82,10 @@ const App = () => {
       // nothing to do for now
       return;
     }
-    getCredsForId(cognitoId, tokens.id_token)
+    getCredsForId(cognitoClient, cognitoId, tokens.id_token)
       .then(setCreds)
       .catch(e => {
-        setStatus("Cognito get credentials error: " + e.toString());
+        setStatus(status.concat(["Cognito get credentials error: " + e.toString()]));
       });
   }, [cognitoId, tokens]);
 
@@ -118,10 +96,10 @@ const App = () => {
     }
     registerVisitor(creds, cognitoId)
       .then(() => {
-        setStatus("added visit to DDB");
+        setStatus(status.concat(["added visit to DDB"]));
       })
       .catch(e => {
-        setStatus("DDB update error: " + e);
+        setStatus(status.concat(["DDB update error: " + e]));
       });
   },
   [creds, cognitoId]);
@@ -135,14 +113,27 @@ const App = () => {
       .then(setVisitorCount);
   }, [creds, cognitoId]);
 
-  const loggedInDisplay = cognitoId ?
-    <p>Welcome back, {cognitoId}</p> :
+  useEffect(() => {
+    postToBackend(tokens.id_token)
+      .then(setBackendApiResponse)
+      .catch(setBackendApiResponse);
+  }, [tokens]);
+
+  const loggedInDisplay = tokens ?
+    <div>
+      <p>Welcome back!
+        Your user pool ID is <b>{getJwtSub(tokens.id_token)}</b> and identity pool ID is <b>{cognitoId}</b>.</p>
+    </div> :
     <p><a href={`https://${USER_POOL_DOMAIN}/login?client_id=${COGNITO_CLIENT_ID}&response_type=code&scope=openid&redirect_uri=${REDIRECT_URI}`}>Log in</a></p>
 
   return <div>
     { loggedInDisplay }
-    <p>Status: {status}</p>
-    <p>Visitor count: {visitorCount}</p>
+    <p>Progress:</p>
+    <ol>
+      {status.map(statusLine => <li key={statusLine}>{statusLine}</li>)}
+    </ol>
+    <p id="ddb">Visitor count from a client-side DynamoDB read: {visitorCount}</p>
+    <p id="backend">Response from an authenticated HTTP POST request: {backendApiResponse}</p>
   </div>;
 }
 

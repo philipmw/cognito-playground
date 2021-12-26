@@ -1,5 +1,7 @@
-import {COGNITO_CLIENT_ID, REDIRECT_URI, USER_POOL_DOMAIN} from "./constants";
+import {COGNITO_CLIENT_ID, IDENTITY_POOL_ID, REDIRECT_URI, USER_POOL_DOMAIN, USER_POOL_ISSUER} from "./constants";
+import {Credentials, GetCredentialsForIdentityCommand, GetIdCommand} from "@aws-sdk/client-cognito-identity";
 
+export type CognitoIdentityId = string | undefined;
 export interface CognitoTokens {
     id_token: string;
     refresh_token: string;
@@ -32,3 +34,29 @@ export function exchangeCodeForTokens(code): Promise<CognitoTokens> {
         xhr.send(bodyParams.toString());
     });
 }
+
+export async function getId(cognitoClient, idToken): Promise<CognitoIdentityId> {
+    const command = new GetIdCommand({
+        IdentityPoolId: IDENTITY_POOL_ID,
+        Logins: {
+            [USER_POOL_ISSUER]: idToken,
+        },
+    });
+    const response = await cognitoClient.send(command);
+    console.log(`Cognito GetId response: ${JSON.stringify(response)}`);
+    return response.IdentityId;
+}
+
+export type Creds = Credentials | undefined;
+export async function getCredsForId(cognitoClient, id, idToken): Promise<Creds> {
+    const command = new GetCredentialsForIdentityCommand({
+        IdentityId: id,
+        Logins: {
+            [USER_POOL_ISSUER]: idToken,
+        },
+    });
+    const response = await cognitoClient.send(command);
+    console.log(`Cognito GetCredentialsForIdentity response: ${JSON.stringify(response)}`);
+    return response.Credentials;
+}
+

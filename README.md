@@ -16,9 +16,12 @@ This project has two parts:
 
 1. A CloudFormation template that sets up the Amazon Cognito user pool, identity pool,
     a DynamoDB table for visit tracking, and IAM roles and policies.
-2. A simple React webapp that accepts the auth code from Cognito user pool's web login
-    endpoint, exchanges the code for JWT tokens, then requests an identity pool ID and
-    short-term AWS credentials to interact with other AWS services (DynamoDB in our case).
+2. A React webapp that accepts the auth code from Cognito user pool's web login endpoint,
+    exchanges the code for JWT tokens, then requests an identity pool ID and short-term
+    AWS credentials to interact with services.
+    The app interacts with DynamoDB directly using the short-term AWS credentials, and
+    it interacts with a protected API Gateway endpoint using the JWT.
+   (This is not great. See *Limitations* section.)
 
 ## Setup
 
@@ -47,6 +50,12 @@ This project has two parts:
     authenticated role that allows only updates to the item keyed by its own
     identity.
 
+Testing the backend API authorization:
+
+1. `curl -v -X POST {API-endpoint}` -- verify you get a HTTP 401 status code response.
+2. Get the `id_token` value from the browser's `tokens` cookie.
+3. `curl -v -X POST -H "Authorization: {id_token}" {API-endpoint}` -- returns HTTP 200 status code.
+
 Voila!
 
 ## Limitations and next steps
@@ -54,3 +63,12 @@ Voila!
 1. While the app remembers and recalls the JWT tokens, it does not have logic to handle
    expired tokens.
    For now, it simply sets the cookie to expire simultaneously with JWTs.
+   When the token expires, Cognito token exchange returns status code 400 with response text:
+   > {"error":"invalid_grant"}
+   
+2. There are two identifiers: *identity pool* ID and *user pool* ID.
+   At this time, I have API Gateway configured for JWT authorization,
+   so the Lambda function receives the caller's *user pool* ID,
+   while I have DynamoDB doing IAM authorization using STS credentials from the Identity Pool,
+   so the DDB table items are keyed by *identity pool* ID.
+   I need to use one ID for both purposes.

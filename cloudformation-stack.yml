@@ -1,9 +1,17 @@
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_Cognito.html
 
 ---
+Parameters:
+  WebServerPort:
+    Default: 8080
+    Description: "Webserver port. Must match Webpack config."
+    Type: Number
+
 Outputs:
-  UserPoolProviderURL:
+  UserPoolProviderUrl:
     Value: !GetAtt UserPool.ProviderURL
+  BackendApiInvokeUrl:
+    Value: !Sub "${BackendApi.ApiEndpoint}/${BackendApiStage}"
 
 Resources:
   UserPool:
@@ -22,7 +30,6 @@ Resources:
           RequireNumbers: false
           RequireSymbols: false
           RequireUppercase: false
-      UserPoolName: playground-up
 
   UserPoolWebLoginClient:
     Type: AWS::Cognito::UserPoolClient
@@ -33,7 +40,7 @@ Resources:
       AllowedOAuthScopes:
         - openid
       CallbackURLs:
-        - http://localhost:8080 # must match Webpack's config
+        - !Sub "http://localhost:${WebServerPort}"
       EnableTokenRevocation: false
       PreventUserExistenceErrors: ENABLED
       SupportedIdentityProviders:
@@ -56,7 +63,6 @@ Resources:
       CognitoIdentityProviders:
         - ClientId: !Ref UserPoolWebLoginClient
           ProviderName: !GetAtt UserPool.ProviderName
-      IdentityPoolName: playground-idpool
 
   AuthenticatedUserRole:
     Type: AWS::IAM::Role
@@ -134,3 +140,185 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: 1
         WriteCapacityUnits: 1
+
+  ###########################
+  # The following are backend resources.
+  # They are intended as a proof-of-concept that we can
+  # authenticate and authorize API calls using Cognito.
+  ###########################
+
+  BackendApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: cognito-playground-api
+      ProtocolType: HTTP
+
+  BackendApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref BackendApi
+      AutoDeploy: true
+      StageName: prod
+
+  BackendApiCognitoAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref BackendApi
+      AuthorizerType: JWT
+      IdentitySource:
+        - "$request.header.Authorization"
+      JwtConfiguration:
+        Audience:
+          - !Ref UserPoolWebLoginClient
+        Issuer: !GetAtt UserPool.ProviderURL
+      Name: Cognito
+
+  # start: root route Lambda function and API Gateway integration
+  BackendLambdaFnRoot:
+    Type: AWS::Lambda::Function
+    Properties:
+      Architectures:
+        - arm64
+      Code:
+        ZipFile: |
+          exports.handler = async function(event) {
+            return {
+              "headers": {
+                "Access-Control-Allow-Headers" : "Authorization, Content-Type",
+                "Access-Control-Allow-Origin": "http://localhost:8080",
+                "Access-Control-Allow-Methods": "OPTIONS,POST,GET"
+              },
+              "isBase64Encoded": false,
+              "statusCode": 200,
+              "body": "Lambda function has this request context: " + JSON.stringify(event.requestContext),
+            };
+          }
+      Handler: index.handler
+      Role: !GetAtt BackendLambdaFnRootExecutionRole.Arn
+      Runtime: nodejs14.x
+
+  BackendLambdaFnRootExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      # No policies
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  BackendApiLambdaIntegrationRoot:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref BackendApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Join
+        - ''
+        - - 'arn:'
+          - !Ref 'AWS::Partition'
+          - ':apigateway:'
+          - !Ref 'AWS::Region'
+          - ':lambda:path/2015-03-31/functions/'
+          - !GetAtt BackendLambdaFnRoot.Arn
+          - '/invocations'
+      IntegrationMethod: POST
+      PayloadFormatVersion: 2.0
+
+  BackendLambdaPermissionRoot:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref BackendLambdaFnRoot
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${BackendApi}/*/*/"
+
+  BackendApiRoutePostRoot:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref BackendApi
+      AuthorizationType: JWT
+      AuthorizerId: !Ref BackendApiCognitoAuthorizer
+      RouteKey: 'POST /'
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref BackendApiLambdaIntegrationRoot
+  # end: root route Lambda function and API Gateway integration
+
+  # start: CORS route Lambda function and API Gateway integration
+  BackendLambdaFnCors:
+    Type: AWS::Lambda::Function
+    Properties:
+      Architectures:
+        - arm64
+      Code:
+        ZipFile: |
+          exports.handler = async function(event) {
+            return {
+              "headers": {
+                "Access-Control-Allow-Headers" : "Authorization, Content-Type",
+                "Access-Control-Allow-Origin": "http://localhost:8080",
+                "Access-Control-Allow-Methods": "OPTIONS,POST,GET"
+              },
+              "isBase64Encoded": false,
+              "statusCode": 200,
+              "body": "",
+            };
+          }
+      Handler: index.handler
+      Role: !GetAtt BackendLambdaFnCorsExecutionRole.Arn
+      Runtime: nodejs14.x
+
+  BackendLambdaFnCorsExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      # No policies
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  BackendApiLambdaIntegrationCors:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref BackendApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Join
+        - ''
+        - - 'arn:'
+          - !Ref 'AWS::Partition'
+          - ':apigateway:'
+          - !Ref 'AWS::Region'
+          - ':lambda:path/2015-03-31/functions/'
+          - !GetAtt BackendLambdaFnCors.Arn
+          - '/invocations'
+      IntegrationMethod: POST
+      PayloadFormatVersion: 2.0
+
+  BackendLambdaPermissionCors:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref BackendLambdaFnCors
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${BackendApi}/*/*/"
+
+  BackendApiRouteCors:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref BackendApi
+      RouteKey: 'OPTIONS /'
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref BackendApiLambdaIntegrationCors
+  # end: CORS route Lambda function and API Gateway integration
