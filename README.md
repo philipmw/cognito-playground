@@ -26,23 +26,18 @@ There are two identifiers: *identity pool* ID and *user pool* ID.
 
 The webapp first authenticates with a user pool (getting a user pool ID),
 then receives an identity pool ID.
-It uses JWT authorization for backend API calls (API Gateway), which means
-the backend gets the *user pool* ID.
-But it uses IAM authorization for client-side DynamoDB calls, which means
-DynamoDB receives and keys items on the *identity pool* ID.
 
-I'd like to standardize on one ID.
+This project creates two backend APIs: one that authenticates with the
+user pool JWT, and one that authenticates with the short-term AWS credentials
+we got via the identity pool's identity.
 
-**Option 1:**
-Convert the API Gateway endpoint to use IAM auth instead of JWT auth.
-Then the webapp can use the *identity pool* ID exclusively.
+We also use the short-term AWS credentials to make client-side DynamoDB
+calls, which means DynamoDB receives and keys items on the *identity pool* ID.
 
-**Option 2:**
-Do not make client-side DynamoDB calls; instead, all operations go through my API endpoint.
-Or find a way to receive STS credentials from the user pool rather than identity pool;
-I did some research and didn't find a way to do it. Only [this AWS forums thread](https://forums.aws.amazon.com/thread.jspa?threadID=230067)
-implies that it's possible.
-Then the webapp can use the *user pool* ID exclusively.
+Hence, the identity pool ID is more comprehensive. We can use it to interact
+both with AWS services directly from browser, and to make authenticated calls
+calls to our own API. The downside of identity pool ID is more complexity
+over using just the user pool.
 
 ## Setup
 
@@ -86,6 +81,3 @@ Voila!
    For now, it simply sets the cookie to expire simultaneously with JWTs.
    When the token expires, Cognito token exchange returns status code 400 with response text:
    > {"error":"invalid_grant"}
-   
-2. There are two identifiers. See the *Identifiers* section above.
-   I want to standardize on one identifier.

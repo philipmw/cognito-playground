@@ -12,7 +12,7 @@ import {
 } from "./constants";
 import {getVisitorCount, registerVisitor} from "./visitor-count-utils";
 import {recallTokens, saveTokens} from "./storage-utils";
-import {postToBackend} from "./backend-utils";
+import {makeHttpJwtRequest, makeHttpSigv4Request} from "./backend-utils";
 import {getJwtSub} from "./jwt-utils";
 
 const cognitoClient = new CognitoIdentityClient({
@@ -36,14 +36,15 @@ const App = () => {
 
   // Business logic
   const [visitorCount, setVisitorCount] = useState(undefined as VisitorCount);
-  const [backendApiResponse, setBackendApiResponse] = useState("{initialState}");
+  const [backendJwtResponse, setBackendJwtResponse] = useState("{no response received}");
+  const [backendIamResponse, setBackendIamResponse] = useState("{no response received}");
 
   useEffect(() => {
     const recalledTokens = recallTokens();
     if (recalledTokens) {
       console.log("recalled tokens: " + recalledTokens);
       setTokens(JSON.parse(recalledTokens));
-      setStatus(status.concat(["recalled tokens"]));
+      setStatus(status.concat(["recalled tokens from browser cache"]));
       return;
     }
 
@@ -112,12 +113,20 @@ const App = () => {
     }
     getVisitorCount(creds, cognitoId)
       .then(setVisitorCount);
+
+    makeHttpSigv4Request(creds)
+      .then(setBackendIamResponse)
+      .catch(setBackendIamResponse);
   }, [creds, cognitoId]);
 
   useEffect(() => {
-    postToBackend(tokens?.id_token)
-      .then(setBackendApiResponse)
-      .catch(setBackendApiResponse);
+    if (tokens?.id_token == undefined) {
+      // nothing to do for now
+      return;
+    }
+    makeHttpJwtRequest(tokens?.id_token)
+      .then(setBackendJwtResponse)
+      .catch(setBackendJwtResponse);
   }, [tokens]);
 
   const loggedInDisplay = tokens ?
@@ -133,8 +142,17 @@ const App = () => {
     <ol>
       {status.map(statusLine => <li key={statusLine}>{statusLine}</li>)}
     </ol>
-    <p id="ddb">Visitor count from a client-side DynamoDB read: {visitorCount}</p>
-    <p id="backend">Response from an authenticated HTTP POST request: {backendApiResponse}</p>
+    <div id="ddb">
+      <p>Visitor count from a client-side DynamoDB read: {visitorCount}</p>
+    </div>
+    <div id="backend-jwt">
+      <p>Response from a JWT-authenticated HTTP GET request:</p>
+      <p>{backendJwtResponse}</p>
+    </div>
+    <div id="backend-iam">
+      <p>Response from an IAM-authenticated HTTP GET request:</p>
+      <p>{backendIamResponse}</p>
+    </div>
   </div>;
 }
 

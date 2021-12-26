@@ -21,6 +21,10 @@ module.exports = {
     extensions: [
       '.js', // needed for webpack-dev-server: https://github.com/webpack/webpack-dev-server/issues/720#issuecomment-268470989
       '.ts',
-      '.tsx']
-  }
+      '.tsx'],
+    fallback: {
+      "crypto": require.resolve("crypto-browserify"),
+      "stream": require.resolve("stream-browserify"),
+    },
+  },
 };
