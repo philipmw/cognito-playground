@@ -6,6 +6,10 @@ Parameters:
     Default: "http://localhost:8080"
     Description: "URL you're testing this playground from"
     Type: String
+  UserPoolDomainName:
+    Default: pmw-playground
+    Description: Domain name for sign-in and sign-up pages
+    Type: String
 
 Outputs:
   UserPoolProviderUrl:
@@ -51,7 +55,7 @@ Resources:
   UserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
     Properties:
-      Domain: pmw-playground
+      Domain: !Ref UserPoolDomainName
       UserPoolId:
         Ref: UserPool
 
