@@ -51,22 +51,16 @@ over using just the user pool.
 1. `npm start` to start the local instance of this webapp.
 2. Look for and click the "Log in" link.
     The presence of this link indicates that the app does not have JWT tokens for you.
-3. Once redirected back to the local webapp, look for:
-
-   > Status: added visit to DDB
-   > 
-   > Welcome back, {ID}
-   > 
-   > Visitor count: {some number}
-
+3. Once redirected back to the local webapp,
+    [successful output will look like this](successful-output.html).
 4. Refresh several times. Feel free to remove the `code` query param.
-    The app remembers you, and the visit counter goes up.
+    The app remembers you, and the visitor counter goes up.
 5. Try changing the primary key (`userId`) of the DDB *UpdateItem*.
     A different primary key will fail, because we have an IAM policy on the
     authenticated role that allows only updates to the item keyed by its own
     identity.
 
-Testing the backend API authorization:
+Isolated testing of the backend API JWT authorization:
 
 1. `curl -v -X POST {API-endpoint}` -- verify you get a HTTP 401 status code response.
 2. Get the `id_token` value from the browser's `tokens` cookie.

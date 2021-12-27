@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Philip's Cognito playground</title>
+    <style>
+        div#ddb {
+            background-color: bisque;
+        }
+        div#backend-jwt {
+            background-color: lightblue;
+        }
+        div#backend-iam {
+            background-color: lightpink;
+        }
+    </style>
+</head>
+<body>
+<div id="app-root"><div><div><p>Welcome back! Your user pool ID is <b>bd47faba-c14c-4b09-8197-c7132bb8e83d</b> and identity pool ID is <b>us-west-2:27d49a3e-d1c8-436c-8baf-62d215cc460a</b>.</p></div><p>Progress:</p><ol><li>recalled tokens from browser cache</li><li>added visit to DDB using IAM access key ASIARPNAJWDR4VMMG4KC</li></ol><div id="ddb"><p>Visitor count from a client-side DynamoDB read: 195</p></div><div id="backend-jwt"><p>Response from a JWT-authenticated HTTP GET request:</p><p>JWT
+ Lambda fn has this request context: 
+{"accountId":"101804781795","apiId":"2m31yzk498","authorizer":{"jwt":{"claims":{"at_hash":"tSjpCz8L4wLgmbTEbyhWbA","aud":"2cf4i1n72khqp4tcituchutf17","auth_time":"1640511422","cognito:username":"pmw","event_id":"cc342d76-85da-44a0-8041-f23369b78d21","exp":"1640515022","iat":"1640511422","iss":"https://cognito-idp.us-west-2.amazonaws.com/us-west-2_uAhQbNf4O","sub":"bd47faba-c14c-4b09-8197-c7132bb8e83d","token_use":"id"},"scopes":null}},"domainName":"2m31yzk498.execute-api.us-west-2.amazonaws.com","domainPrefix":"2m31yzk498","http":{"method":"GET","path":"/prod/jwt","protocol":"HTTP/1.1","sourceIp":"97.120.188.116","userAgent":"Mozilla/5.0
+ (Macintosh; Intel Mac OS X 10.15; rv:95.0) Gecko/20100101 
+Firefox/95.0"},"requestId":"K8937gJxPHcEMBA=","routeKey":"GET 
+/jwt","stage":"prod","time":"26/Dec/2021:10:26:45 
++0000","timeEpoch":1640514405718}</p></div><div id="backend-iam"><p>Response from an IAM-authenticated HTTP GET request:</p><p>IAM
+ Lambda fn has this request context: 
+{"accountId":"101804781795","apiId":"2m31yzk498","authorizer":{"iam":{"accessKey":"ASIARPNAJWDR4VMMG4KC","accountId":"101804781795","callerId":"AROARPNAJWDRTHZ3SOOYL:CognitoIdentityCredentials","cognitoIdentity":{"amr":["authenticated","cognito-idp.us-west-2.amazonaws.com/us-west-2_uAhQbNf4O","cognito-idp.us-west-2.amazonaws.com/us-west-2_uAhQbNf4O:CognitoSignIn:bd47faba-c14c-4b09-8197-c7132bb8e83d"],"identityId":"us-west-2:27d49a3e-d1c8-436c-8baf-62d215cc460a","identityPoolId":"us-west-2:f989179b-9f1e-4678-8305-fae4c3c1dccc"},"principalOrgId":null,"userArn":"arn:aws:sts::101804781795:assumed-role/cognito-playground-AuthenticatedUserRole-5WX2S5UR0GMZ/CognitoIdentityCredentials","userId":"AROARPNAJWDRTHZ3SOOYL:CognitoIdentityCredentials"}},"domainName":"2m31yzk498.execute-api.us-west-2.amazonaws.com","domainPrefix":"2m31yzk498","http":{"method":"GET","path":"/prod/iam","protocol":"HTTP/1.1","sourceIp":"97.120.188.116","userAgent":"Mozilla/5.0
+ (Macintosh; Intel Mac OS X 10.15; rv:95.0) Gecko/20100101 
+Firefox/95.0"},"requestId":"K8938hoXPHcEMnw=","routeKey":"GET 
+/iam","stage":"prod","time":"26/Dec/2021:10:26:45 
++0000","timeEpoch":1640514405842}</p></div></div></div>
+
+</body></html>
